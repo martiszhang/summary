@@ -1,0 +1,33 @@
+- hosts: vpcawx
+  tasks:
+    - name: Update software pip
+      pip: 
+        name: "{{ item }}" 
+        state: latest
+        extra_args: -i http://{{ groups['fileserver'] | join( ) }}/simple  --trusted-host {{ groups['fileserver'] | join( ) }}
+      loop:
+        - pip
+        - docker
+        - setuptools
+        - pexpect
+
+    - name: Find /root/.ssh/ contain [id_rsa,id_rsa.pub]
+      find: paths=/root/.ssh patterns='id_rsa*'
+      register: result
+
+    - name: debug
+      debug: msg="{{ result }}"
+
+    - name: generate  id_rsa and id_rsa.pub of  ansible hosts
+      shell: ssh-keygen -f /root/.ssh/id_rsa -t rsa -N ''
+      when: result.matched != 2
+
+  
+    - name: set  trush  between ansibe hosts  and infra hosts
+      expect:  
+        command: ssh-copy-id  -o StrictHostKeyChecking=no -i /root/.ssh/id_rsa.pub root@{{ item }}
+        timeout: 90
+        responses: 
+          (?i)password: "{{ password }}"
+      with_items: "{{ groups['nodes'] }}"
+      when: item  not in groups['vpcawx'] and item not in groups['fileserver']

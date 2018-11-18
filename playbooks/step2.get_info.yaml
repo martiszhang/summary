@@ -1,0 +1,28 @@
+- hosts: infra
+  tasks:
+    - name: print host information 
+      debug: msg="{{ansible_hostname}}=== {{ ansible_all_ipv4_addresses }} === {{ ansible_default_ipv4.gateway }}==={{ ansible_interfaces }} "
+      when: inventory_hostname not in groups['fileserver'] and inventory_hostname not in groups['vpcawx']
+
+    - name: register some var
+      set_fact: interface={{ ansible_interfaces |  select('match', '^eth[0-9]+') | list }} 
+    
+    - name: print host  interface information 
+      debug: msg=" {{ interface }} "
+      when: inventory_hostname not in groups['fileserver'] and inventory_hostname not in groups['vpcawx']
+
+    - name: exit the playbook because {{ inventory_hostname  }} only on interface
+      fail: msg="exit the playbook because {{ inventory_hostname  }} only on interface"
+      when: inventory_hostname not in groups['fileserver'] and inventory_hostname not in groups['vpcawx'] and ( interface | length ) < 2
+
+
+    - name: get the ip of interface
+      set_fact: interface_ip={{  hostvars[inventory_hostname]['ansible_' + item ]['ipv4']['address'] }}
+      with_items: "{{ interface }}"
+      ignore_errors: yes
+
+    - name: exit the playbook because {{ inventory_hostname }} do not have enough ip addr 
+      fail: msg="{{ inventory_hostname }} do not have enough ip addr"  
+      when: interface_ip is not defined or interface_ip == ""
+
+    
